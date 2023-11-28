@@ -1,4 +1,6 @@
 import random
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 class Space():
@@ -35,15 +37,27 @@ class Space():
     def hill_climb(self, maximum=None, image_prefix=None, log=False):
         """Performs hill-climbing to find a solution."""
         count = 0
+        path = []  # Initialize an empty list to store the path
 
         # Start by initializing hospitals randomly
         self.hospitals = set()
+        initial_hospital_positions = []  # Array to store initial positions
+
         for i in range(self.num_hospitals):
             self.hospitals.add(random.choice(list(self.available_spaces())))
+            initial_hospital_positions.append(list(self.hospitals))
+            if self.num_hospitals == 1:
+               ready_to_path = initial_hospital_positions[0][0] #convert [[()]] to [()]
+               path.append(ready_to_path)
+
+
+
         if log:
             print("Initial state: cost", self.get_cost(self.hospitals))
         if image_prefix:
             self.output_image(f"{image_prefix}{str(count).zfill(3)}.png")
+
+
 
         # Continue until we reach maximum number of iterations
         while maximum is None or count < maximum:
@@ -72,7 +86,7 @@ class Space():
 
             # None of the neighbors are better than the current state
             if best_neighbor_cost >= self.get_cost(self.hospitals):
-                return self.hospitals
+                break
 
             # Move to a highest-valued neighbor
             else:
@@ -80,9 +94,18 @@ class Space():
                     print(f"Found better neighbor: cost {best_neighbor_cost}")
                 self.hospitals = random.choice(best_neighbors)
 
+            # Append the current hospitals to the path
+            if self.num_hospitals == 1:
+               path_ready = next(iter(self.hospitals)) # Convert {()} to ()
+               path.append(path_ready)
+
+
             # Generate image
             if image_prefix:
                 self.output_image(f"{image_prefix}{str(count).zfill(3)}.png")
+
+        return path if self.num_hospitals == 1 else 1
+
 
     def random_restart(self, maximum, image_prefix=None, log=False):
         """Repeats hill-climbing multiple times."""
@@ -189,11 +212,51 @@ class Space():
 
         img.save(filename)
 
+    def calculate_heat_map(self):
+        heat_map = []
+        for row in range(self.height):
+            row_data = []
+            for col in range(self.width):
+                total_distance = sum(
+                    abs(row - house_row) + abs(col - house_col)
+                    for house_row, house_col in self.houses
+                )
+                row_data.append(total_distance)
+            heat_map.append(row_data)
+
+        return heat_map
+
+    def heat_map(self, hospital_path):
+        heat_map = self.calculate_heat_map()
+        heat_map_array = np.array(heat_map)  # Convert to a NumPy array
+        plt.imshow(heat_map_array, cmap='hot', interpolation='nearest')
+        # Plot the hospital's path
+        if hospital_path != 1:
+            y, x = zip(*hospital_path)  # Take x and y coordinates from array
+
+            if y[0] < y[1] and x[0]==x[1]:
+                 plt.plot(x[0],y[0],marker='v', markersize=10, linestyle='-', color='green')
+            if y[0] > y[1] and x[0]==x[1]:
+                 plt.plot(x[0],y[0],marker='^', markersize=10, linestyle='-', color='green')
+            if y[0] == y[1] and x[0] > x[1]:
+                plt.plot(x[0], y[0], marker='<', markersize=10, linestyle='-', color='green')
+            if y[0] == y[1] and x[0] < x[1]:
+                plt.plot(x[0], y[0], marker='>', markersize=10, linestyle='-', color='green')
+            plt.plot(x, y, marker='', markersize=5, linestyle='-', color='green')
+            plt.plot(x[-1], y[-1], marker='*', markersize=10, linestyle='-', color='green')
+        plt.colorbar()
+        plt.title("Heat Map of Manhattan distances of a hospital to all houses")
+        plt.show()
+
 
 # Create a new space and add houses randomly
-s = Space(height=10, width=20, num_hospitals=3)
-for i in range(15):
+
+s = Space(height=10, width=15, num_hospitals=1)
+for i in range(18):
     s.add_house(random.randrange(s.height), random.randrange(s.width))
 
-# Use local search to determine hospital placement
-hospitals = s.hill_climb(image_prefix="hospitals", log=True)
+
+hospital_path = s.hill_climb(image_prefix="hospitals", log=True)
+
+
+s.heat_map(hospital_path)
